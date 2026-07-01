@@ -1,0 +1,24 @@
+name: Auto Create Branch
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  create-branch:
+    if: contains(github.event.issue.labels.*.name, 'art')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create and Push Branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="feature/issue-${{ github.event.issue.number }}"
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git checkout -b $BRANCH_NAME
+          git push origin $BRANCH_NAME
+          gh issue comment ${{ github.event.issue.number }} --body "✅ สร้าง Branch '$BRANCH_NAME' ให้แล้วครับ เริ่มทำงานได้เลย!"
