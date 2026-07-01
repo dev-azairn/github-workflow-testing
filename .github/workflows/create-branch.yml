@@ -4,8 +4,6 @@ on:
     types: [opened, labeled]
 
 concurrency:
-  # Ensures only one run per issue number executes at a time,
-  # preventing the "opened" and "labeled" events from racing each other.
   group: create-branch-issue-${{ github.event.issue.number }}
   cancel-in-progress: false
 
@@ -30,7 +28,6 @@ jobs:
           BRANCH_NAME="feature/issue-${{ github.event.issue.number }}"
           echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
 
-          # Use an exact ref match instead of substring match
           MATCH=$(git ls-remote --heads origin "refs/heads/$BRANCH_NAME")
           if [ -n "$MATCH" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
@@ -43,6 +40,11 @@ jobs:
         run: |
           BRANCH_NAME="${{ steps.check_branch.outputs.branch_name }}"
           git checkout -b "$BRANCH_NAME"
+
+          # Empty commit so the branch has a diff vs art-team,
+          # otherwise "gh pr create" fails with "No commits between..."
+          git commit --allow-empty -m "chore: initialize branch for issue #${{ github.event.issue.number }}"
+
           git push origin "$BRANCH_NAME"
 
       - name: Check if PR already exists
