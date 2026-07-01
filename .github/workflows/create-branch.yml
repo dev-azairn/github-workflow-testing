@@ -1,33 +1,62 @@
-name: Auto Create Branch
+name: Auto Create Branch for Art Issues
 on:
   issues:
-    types: [opened]
+    types: [opened, labeled]
 
 jobs:
   create-branch:
+    # Only run if the issue has the "art" label
+    if: contains(github.event.issue.labels.*.name, 'art')
     runs-on: ubuntu-latest
     permissions:
       contents: write
       issues: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout art-team branch
+        uses: actions/checkout@v4
         with:
-          ref: art-team # ระบุให้ดึง branch art-team มาเป็นฐาน
+          ref: art-team
+          fetch-depth: 0
 
-      - name: Create and Link Branch
+      - name: Check if branch already exists
+        id: check_branch
+        run: |
+          BRANCH_NAME="feature/issue-${{ github.event.issue.number }}"
+          if git ls-remote --exit-code --heads origin "$BRANCH_NAME"; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push branch
+        if: steps.check_branch.outputs.exists == 'false'
+        run: |
+          BRANCH_NAME="${{ steps.check_branch.outputs.branch_name }}"
+          git checkout -b "$BRANCH_NAME"
+          git push origin "$BRANCH_NAME"
+
+      - name: Create Draft PR linked to Issue
+        if: steps.check_branch.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BRANCH_NAME="feature/issue-${{ github.event.issue.number }}"
-          
-          # สร้าง branch ใหม่โดยอ้างอิงจาก art-team
-          git checkout -b $BRANCH_NAME
-          git push origin $BRANCH_NAME
-          
-          # สร้าง PR ร่างเพื่อเชื่อมโยงกับ Issue และ Development Section
+          BRANCH_NAME="${{ steps.check_branch.outputs.branch_name }}"
           gh pr create \
-            --title "Work for #${{ github.event.issue.number }}" \
-            --body "Closes #${{ github.event.issue.number }}" \
-            --head $BRANCH_NAME \
+            --draft \
+            --title "[Art] Work for #${{ github.event.issue.number }} - ${{ github.event.issue.title }}" \
+            --body "Closes #${{ github.event.issue.number }}
+
+            Auto-created branch \`$BRANCH_NAME\` from \`art-team\` for this issue." \
+            --head "$BRANCH_NAME" \
             --base art-team
+
+      - name: Comment on Issue with branch link
+        if: steps.check_branch.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="${{ steps.check_branch.outputs.branch_name }}"
+          gh issue comment ${{ github.event.issue.number }} \
+            --body "🌿 Branch \`$BRANCH_NAME\` has been created from \`art-team\` and linked via a draft PR."
