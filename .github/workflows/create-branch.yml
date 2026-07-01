@@ -3,9 +3,14 @@ on:
   issues:
     types: [opened, labeled]
 
+concurrency:
+  # Ensures only one run per issue number executes at a time,
+  # preventing the "opened" and "labeled" events from racing each other.
+  group: create-branch-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
 jobs:
   create-branch:
-    # Only run if the issue has the "art" label
     if: contains(github.event.issue.labels.*.name, 'art')
     runs-on: ubuntu-latest
     permissions:
@@ -19,16 +24,19 @@ jobs:
           ref: art-team
           fetch-depth: 0
 
-      - name: Check if branch already exists
+      - name: Check if branch already exists (exact match)
         id: check_branch
         run: |
           BRANCH_NAME="feature/issue-${{ github.event.issue.number }}"
-          if git ls-remote --exit-code --heads origin "$BRANCH_NAME"; then
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+
+          # Use an exact ref match instead of substring match
+          MATCH=$(git ls-remote --heads origin "refs/heads/$BRANCH_NAME")
+          if [ -n "$MATCH" ]; then
             echo "exists=true" >> "$GITHUB_OUTPUT"
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
-          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Create and push branch
         if: steps.check_branch.outputs.exists == 'false'
@@ -37,8 +45,21 @@ jobs:
           git checkout -b "$BRANCH_NAME"
           git push origin "$BRANCH_NAME"
 
+      - name: Check if PR already exists
+        id: check_pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH_NAME="${{ steps.check_branch.outputs.branch_name }}"
+          PR_EXISTS=$(gh pr list --head "$BRANCH_NAME" --base art-team --json number --jq 'length')
+          if [ "$PR_EXISTS" -gt 0 ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create Draft PR linked to Issue
-        if: steps.check_branch.outputs.exists == 'false'
+        if: steps.check_pr.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
