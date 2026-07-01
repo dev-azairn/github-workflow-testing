@@ -5,20 +5,27 @@ on:
 
 jobs:
   create-branch:
-    if: contains(github.event.issue.labels.*.name, 'art')
     runs-on: ubuntu-latest
     permissions:
       contents: write
       issues: write
+      pull-requests: write # เพิ่ม permission นี้
     steps:
       - uses: actions/checkout@v4
-      - name: Create and Push Branch
+      - name: Create and Link Branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # สร้างชื่อ branch
           BRANCH_NAME="feature/issue-${{ github.event.issue.number }}"
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git checkout -b $BRANCH_NAME
+          
+          # ใช้คำสั่ง gh api เพื่อสร้าง branch จาก main (หรือ branch หลักของคุณ)
+          # และระบุว่าเป็นการเชื่อมโยงกับ Issue นี้
+          # หมายเหตุ: คุณต้องมี branch main หรือ master อยู่ก่อนแล้ว
+          git fetch origin
+          git checkout -b $BRANCH_NAME origin/main
           git push origin $BRANCH_NAME
-          gh issue comment ${{ github.event.issue.number }} --body "✅ สร้าง Branch '$BRANCH_NAME' ให้แล้วครับ เริ่มทำงานได้เลย!"
+          
+          # ใช้ gh เชื่อมโยง branch เข้ากับ issue (ผ่านการทำ PR ล่วงหน้า หรือการระบุข้อมูล)
+          # วิธีที่ง่ายที่สุดเพื่อให้มันขึ้นใน Development คือการสร้าง PR ร่างไว้
+          gh pr create --title "Draft: Work for #${{ github.event.issue.number }}" --body "Closes #${{ github.event.issue.number }}" --head $BRANCH_NAME --base main
