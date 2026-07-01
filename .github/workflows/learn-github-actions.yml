@@ -1,4 +1,4 @@
-name: Godot GUT Test and Build
+name: Godot GUT Test, Build, and Artifact
 
 on:
   push:
@@ -20,6 +20,9 @@ jobs:
           use-dotnet: false
           include-templates: true
 
+      - name: Import resources
+        run: godot --headless --import
+
       - name: Run GUT tests
         run: godot --headless -s addons/gut/gut_cmdln.gd -gdir=res://tests
 
@@ -38,7 +41,16 @@ jobs:
           use-dotnet: false
           include-templates: true
 
+      - name: Import resources
+        run: godot --headless --import
+
       - name: Export project
         run: |
           mkdir -p build/linux
           godot --headless --export-release "Linux" build/linux/game.x86_64
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: godot-linux-build
+          path: build/linux/game.x86_64
