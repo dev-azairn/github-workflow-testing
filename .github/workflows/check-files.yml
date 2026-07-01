@@ -1,0 +1,50 @@
+name: Validate Art Assets
+
+on:
+  pull_request:
+    branches:
+      - art-team
+    types: [opened, synchronize, reopened]
+
+jobs:
+  validate-files:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+      issues: read
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate Files from Issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # ดึงเลข Issue จากเนื้อหา PR (เช่น "closes #123")
+          PR_BODY=$(gh pr view ${{ github.event.pull_request.number }} --json body --jq '.body')
+          ISSUE_NUM=$(echo "$PR_BODY" | grep -oE '#[0-9]+' | head -1 | tr -d '#')
+
+          if [ -z "$ISSUE_NUM" ]; then
+            echo "::error::ไม่พบการเชื่อมโยง Issue (กรุณาใส่ 'Closes #เลขissue' ใน PR description)"
+            exit 1
+          fi
+
+          # ดึงไฟล์ที่คาดหวังจาก Issue
+          ISSUE_BODY=$(gh issue view $ISSUE_NUM --json body --jq '.body')
+          EXPECTED_FILES=$(echo "$ISSUE_BODY" | grep -oE 'Assets/[^[:space:]]*')
+
+          # ตรวจสอบไฟล์
+          MISSING_FILES=()
+          for file in $EXPECTED_FILES; do
+            if [ ! -f "$file" ]; then
+              MISSING_FILES+=("$file")
+            fi
+          done
+
+          if [ ${#MISSING_FILES[@]} -ne 0 ]; then
+            echo "::error::พบไฟล์ที่หายไปจากรายการที่ระบุใน Issue #$ISSUE_NUM:"
+            for missing in "${MISSING_FILES[@]}"; do echo "- $missing"; done
+            exit 1
+          else
+            echo "✅ ตรวจสอบไฟล์ครบถ้วนตาม Issue #$ISSUE_NUM"
+          fi
