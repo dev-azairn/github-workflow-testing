@@ -1,12 +1,11 @@
-extends RefCounted
-class_name TestPlayer
+extends GutTest
 
-func test_take_damage():
+func test_take_damage_reduces_health():
 	var player = load("res://scripts/Player.gd").new()
 	player.take_damage(30)
-	assert(player.health == 70)
+	assert_eq(player.health, 70, "Health should be reduced by 30")
 
-func test_health_never_negative():
+func test_health_does_not_go_negative():
 	var player = load("res://scripts/Player.gd").new()
 	player.take_damage(200)
-	assert(player.health == 0)
+	assert_eq(player.health, 0, "Health should not go below 0")
