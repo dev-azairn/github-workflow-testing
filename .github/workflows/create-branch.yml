@@ -9,23 +9,25 @@ jobs:
     permissions:
       contents: write
       issues: write
-      pull-requests: write # เพิ่ม permission นี้
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: art-team # ระบุให้ดึง branch art-team มาเป็นฐาน
+
       - name: Create and Link Branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # สร้างชื่อ branch
           BRANCH_NAME="feature/issue-${{ github.event.issue.number }}"
           
-          # ใช้คำสั่ง gh api เพื่อสร้าง branch จาก main (หรือ branch หลักของคุณ)
-          # และระบุว่าเป็นการเชื่อมโยงกับ Issue นี้
-          # หมายเหตุ: คุณต้องมี branch main หรือ master อยู่ก่อนแล้ว
-          git fetch origin
-          git checkout -b $BRANCH_NAME origin/main
+          # สร้าง branch ใหม่โดยอ้างอิงจาก art-team
+          git checkout -b $BRANCH_NAME
           git push origin $BRANCH_NAME
           
-          # ใช้ gh เชื่อมโยง branch เข้ากับ issue (ผ่านการทำ PR ล่วงหน้า หรือการระบุข้อมูล)
-          # วิธีที่ง่ายที่สุดเพื่อให้มันขึ้นใน Development คือการสร้าง PR ร่างไว้
-          gh pr create --title "Draft: Work for #${{ github.event.issue.number }}" --body "Closes #${{ github.event.issue.number }}" --head $BRANCH_NAME --base main
+          # สร้าง PR ร่างเพื่อเชื่อมโยงกับ Issue และ Development Section
+          gh pr create \
+            --title "Work for #${{ github.event.issue.number }}" \
+            --body "Closes #${{ github.event.issue.number }}" \
+            --head $BRANCH_NAME \
+            --base art-team
